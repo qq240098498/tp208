@@ -39,10 +39,13 @@ function overview(data) {
   const orderStatusCount = {};
   for (const o of orders) orderStatusCount[o.status] = (orderStatusCount[o.status] || 0) + 1;
 
+  const tolerance = Number(settings.flowDeviationTolerance || 0);
   const exceededCount = data.levels.filter((l) => {
     const reservoir = data.reservoirs.find((r) => r.id === l.reservoirId);
     return reservoir ? water.levelCheck(reservoir, l.level, l.date, settings).exceeded : false;
   }).length;
+
+  const outOfRange = orders.filter((o) => o.withinTolerance === false && o.status !== '已撤销');
 
   return {
     today,
@@ -54,7 +57,9 @@ function overview(data) {
     orderCount: data.orders.length,
     orderStatusCount,
     activeOrders: orders.filter((o) => o.status === '已下达' || o.status === '执行中').length,
-    orderDeviationCount: orders.filter((o) => o.deviation !== null && Math.abs(o.deviation) > 5).length,
+    orderDeviationCount: outOfRange.length,
+    orderDeviationUnclassifiedCount: outOfRange.filter((o) => !o.deviationReason).length,
+    flowDeviationTolerance: tolerance,
     lossPerDayWan: Number(settings.lossPerDayWan),
     toleranceWan: Number(settings.balanceToleranceWan),
     floodSeason: settings.floodSeasonStart + ' 至 ' + settings.floodSeasonEnd,

@@ -8,7 +8,8 @@
     "lossPerDayWan": 1.2,
     "levelPrecision": 0.01,
     "inflowAttentionFlow": 120,
-    "inflowSeriousFlow": 260
+    "inflowSeriousFlow": 260,
+    "flowDeviationTolerance": 5
   },
   "reservoirs": [
     {
@@ -1763,7 +1764,15 @@
           "note": "镇水利站报送",
           "at": "2026-05-06"
         }
-      ]
+      ],
+      "executionAt": "2026-05-06",
+      "executor": "值班员甲",
+      "completionAt": "2026-05-10",
+      "acceptor": "王调度长",
+      "revokedAt": "",
+      "revoker": "",
+      "deviationReason": "下游需水调整",
+      "deviationNote": "灌区实际需水小于申报值，按调度科电话调低出力"
     },
     {
       "id": "ord-0002",
@@ -1783,7 +1792,15 @@
           "note": "暴雨橙色预警",
           "at": "2026-06-08"
         }
-      ]
+      ],
+      "executionAt": "2026-06-08",
+      "executor": "值班员乙",
+      "completionAt": "2026-06-10",
+      "acceptor": "王调度长",
+      "revokedAt": "",
+      "revoker": "",
+      "deviationReason": "设备故障",
+      "deviationNote": "2号泄洪闸启闭机故障，只能靠发电流量下泄，未能达到预泄目标"
     },
     {
       "id": "ord-0003",
@@ -1797,7 +1814,15 @@
       "reason": "汛末水位回落",
       "issuer": "调度科",
       "remark": "",
-      "attachments": []
+      "attachments": [],
+      "executionAt": "2026-09-12",
+      "executor": "值班员甲",
+      "completionAt": "",
+      "acceptor": "",
+      "revokedAt": "",
+      "revoker": "",
+      "deviationReason": "",
+      "deviationNote": ""
     },
     {
       "id": "ord-0004",
@@ -1817,7 +1842,38 @@
           "note": "来电撤销",
           "at": "2026-05-05"
         }
-      ]
+      ],
+      "executionAt": "",
+      "executor": "",
+      "completionAt": "",
+      "acceptor": "",
+      "revokedAt": "2026-05-05",
+      "revoker": "调度科",
+      "deviationReason": "",
+      "deviationNote": ""
+    },
+    {
+      "id": "ord-0005",
+      "code": "ZL-0005",
+      "reservoirId": "res-0001",
+      "issuedAt": "2026-09-24",
+      "targetFlow": 12,
+      "windowStart": "2026-09-24",
+      "windowEnd": "2026-09-24",
+      "status": "已下达",
+      "reason": "21",
+      "issuer": "321213",
+      "remark": "21",
+      "attachments": [],
+      "executionAt": "",
+      "executor": "",
+      "completionAt": "",
+      "acceptor": "",
+      "revokedAt": "",
+      "revoker": "",
+      "deviationReason": "",
+      "deviationNote": ""
     }
-  ]
+  ],
+  "orderCodeSeq": 5
 }

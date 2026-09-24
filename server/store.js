@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS = {
   levelPrecision: 0.01,
   inflowAttentionFlow: 120,
   inflowSeriousFlow: 260,
+  // 调度指令实际平均下泄流量相对目标流量的允许偏差，±，单位 m³/s
+  flowDeviationTolerance: 5,
 };
 
 function normalize(raw) {
@@ -21,6 +23,22 @@ function normalize(raw) {
   data.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
   for (const key of ['reservoirs', 'curves', 'levels', 'inflows', 'releases', 'orders']) {
     if (!Array.isArray(data[key])) data[key] = [];
+  }
+  // 老数据补闭环字段：下达/执行/完成/撤销各段时刻与人员，偏差原因分类
+  for (const order of data.orders) {
+    for (const key of ['executionAt', 'executor', 'completionAt', 'acceptor', 'revokedAt', 'revoker', 'deviationReason', 'deviationNote']) {
+      if (order[key] === undefined) order[key] = '';
+    }
+    if (!Array.isArray(order.attachments)) order.attachments = [];
+  }
+  // 指令编号序列：取现存最大编号，删掉指令后新增也不重号
+  if (!Number.isFinite(Number(data.orderCodeSeq))) {
+    let max = 0;
+    for (const o of data.orders) {
+      const n = parseInt(String(o.code || '').replace(/^ZL-/, ''), 10);
+      if (Number.isFinite(n)) max = Math.max(max, n);
+    }
+    data.orderCodeSeq = max;
   }
   return data;
 }

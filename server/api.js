@@ -58,6 +58,15 @@ router.get('/orders/:id', withData((data, req) => records.decorateOrder(data, re
 router.patch('/orders/:id', withData((data, req) => ({ __save: true, __body: records.updateOrder(data, req.params.id, req.body || {}) })));
 router.post('/orders/:id/copy', withData((data, req) => ({ __save: true, __body: records.copyOrder(data, req.params.id, req.body) })));
 router.post('/orders/:id/attachments', withData((data, req) => ({ __save: true, __body: records.addAttachment(data, req.params.id, req.body || {}) })));
+// 闭环阶段登记：action = start（开始执行）/ complete（完成验收）/ revoke（撤销）
+router.post('/orders/:id/stages/:action', withData((data, req) => ({ __save: true, __body: records.recordStage(data, req.params.id, req.params.action, req.body || {}) })));
+// 执行中登记实际下泄流量（写入出库记录并与指令挂钩）
+router.post('/orders/:id/executions', withData((data, req) => {
+  const result = records.registerExecutionFlow(data, req.params.id, req.body || {});
+  return { __save: true, __body: { updated: !!result.__updated, releaseId: result.releaseId, order: result.order } };
+}));
+// 偏差超出允许范围时登记原因分类
+router.patch('/orders/:id/deviation', withData((data, req) => ({ __save: true, __body: records.classifyDeviation(data, req.params.id, req.body || {}) })));
 router.delete('/orders/:id', withData((data, req) => ({ __save: true, __body: records.removeOrder(data, req.params.id) })));
 
 router.get('/balance', withData((data, req) => {

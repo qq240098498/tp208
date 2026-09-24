@@ -8,6 +8,7 @@
 
   var VIEW_IDS = ['overview', 'reservoirs', 'water', 'orders', 'balance'];
   var ORDER_STATUSES = ['已下达', '执行中', '已完成', '已撤销'];
+  var DEVIATION_REASONS = ['上游来水偏大', '上游来水偏小', '设备故障', '机组检修', '闸门操作误差', '下游需水调整', '雨情变化', '记录缺失待核', '其他'];
   var RESERVOIR_STATUSES = ['运行', '检修'];
 
   function el(id) { return document.getElementById(id); }
@@ -81,6 +82,26 @@
     return '<span class="' + cls + '">' + esc(dash(status)) + '</span>';
   }
 
+  function orderStatusTag(status) {
+    var cls = 'tag';
+    if (status === '已完成') cls = 'tag is-ok';
+    else if (status === '执行中') cls = 'tag is-strong';
+    else if (status === '已撤销') cls = 'tag is-warn';
+    return '<span class="' + cls + '">' + esc(dash(status)) + '</span>';
+  }
+
+  function toleranceTag(o) {
+    if (o.withinTolerance === null || o.withinTolerance === undefined) return '<span class="tag">—</span>';
+    if (o.withinTolerance) return '<span class="tag is-ok">在范围内</span>';
+    return '<span class="tag is-over">超出范围</span>';
+  }
+
+  function deviationText(o) {
+    if (o.deviation === null || o.deviation === undefined) return '—';
+    var n = Number(o.deviation);
+    return (n > 0 ? '+' : '') + String(n);
+  }
+
   function emptyRow(colspan, text) {
     return '<tr class="detail-row"><td colspan="' + colspan + '"><p class="empty">' + esc(text) + '</p></td></tr>';
   }
@@ -127,6 +148,7 @@
     levels: [],
     flows: { inflow: [], release: [] },
     orders: [],
+    orderDeviations: [],
     balance: null,
     expanded: { reservoir: '', level: '', flow: '', order: '' },
     reservoirDetail: null,
@@ -186,7 +208,7 @@
         hint.textContent = String(message);
         hint.removeAttribute('hidden');
       }
-      var input = qs('[name="' + key + '"]');
+      var input = qs('[name="' + key + '"]') || qs('[data-stage-field="' + key + '"]') || qs('[data-exec-field="' + key + '"]');
       if (input) input.classList.add('is-invalid');
       var matched = /^points\.(\d+)$/.exec(key);
       if (matched) {
@@ -242,6 +264,7 @@
         renderWater();
       } else if (view === 'orders') {
         state.orders = await api('GET', '/api/orders' + ordersQuery());
+        state.orderDeviations = await api('GET', '/api/orders?outOfRange=1');
         renderOrders();
       } else if (view === 'balance') {
         renderBalance();
@@ -357,7 +380,10 @@
       html.push('<button type="button" class="btn btn-ghost btn-sm" data-action="reset-filter" data-scope="orders">重置筛选</button>');
       html.push('</div>');
       html.push('<div class="side-block"><h3>口径</h3><ul class="side-list">');
-      html.push('<li>实际均值与偏差取接口</li>');
+      html.push('<li>状态按 已下达 → 执行中 → 已完成 逐段登记</li>');
+      html.push('<li>实际均值 = 时段内逐日出库流量的算术平均（接口）</li>');
+      html.push('<li>偏差 = 实际均值 − 目标，允许 ±' + esc(dash(state.settings ? state.settings.flowDeviationTolerance : '')) + ' m³/s</li>');
+      html.push('<li>缺记日期、是否在范围内均取接口</li>');
       html.push('<li>删除一律两步确认</li>');
       html.push('</ul></div>');
     } else if (view === 'balance') {
@@ -415,7 +441,8 @@
         metricCard('超限记录数', s.exceededCount, '点卡去「水位与流量」逐条核对', 'water', 'kind=level', true),
         metricCard('指令数', s.orderCount, '点卡去「调度指令」', 'orders', ''),
         metricCard('执行中加已下达', active, '执行中与已下达合计', 'orders', ''),
-        metricCard('偏差超限指令数', s.orderDeviationCount, '偏差绝对值大于 5 的指令', 'orders', '', true),
+        metricCard('偏差超限指令数', s.orderDeviationCount, '平均下泄流量超出允许范围 ±' + s.flowDeviationTolerance + ' m³/s', 'orders', '', true),
+        metricCard('超限未分类', s.orderDeviationUnclassifiedCount, '偏差超限但还没登记原因分类的指令', 'orders', '', true),
         metricCard('每天损失', s.lossPerDayWan, '单位 万m³，可去设置里改', 'balance', ''),
         metricCard('容差', s.toleranceWan, '单位 万m³，可去设置里改', 'balance', '')
       ].join('');
@@ -712,7 +739,173 @@
     return queryString({ reservoirId: f.reservoirId, status: f.status });
   }
 
+  function reasonOptions(current) {
+    var html = ['<option value="">请选原因分类</option>'];
+    DEVIATION_REASONS.forEach(function (r) {
+      html.push('<option value="' + esc(r) + '"' + (r === current ? ' selected' : '') + '>' + esc(r) + '</option>');
+    });
+    return html.join('');
+  }
+
+  /* 偏差超出允许范围的指令清单（含原因分类登记）；不受列表状态筛选影响 */
+  function renderOrderDeviations() {
+    var box = el('orderDeviationList');
+    if (!box) return;
+    var rows = state.orderDeviations || [];
+    if (!rows.length) {
+      box.innerHTML = '<p class="empty">没有偏差超出允许范围的指令。允许偏差取设置中的 ±'
+        + esc(dash(state.settings ? state.settings.flowDeviationTolerance : '')) + ' m³/s。</p>';
+      return;
+    }
+    var html = ['<p class="side-note">允许偏差 ±' + esc(dash(state.settings ? state.settings.flowDeviationTolerance : ''))
+      + ' m³/s（在「设置」里改）；平均下泄流量 = 时段内逐日出库流量的算术平均。以下 ' + rows.length + ' 条超出范围，要逐条登记原因分类：</p>'];
+    html.push('<div class="table-wrap"><table class="table"><thead><tr>'
+      + '<th>编号</th><th>水库</th><th>时段</th><th>状态</th>'
+      + '<th class="num">目标</th><th class="num">实际均值</th><th class="num">偏差</th><th>原因分类</th><th>说明 / 操作</th>'
+      + '</tr></thead><tbody>');
+    rows.forEach(function (o) {
+      html.push('<tr class="' + (o.deviationReason ? '' : 'is-unclassified') + '">'
+        + '<td>' + esc(o.code) + '</td>'
+        + '<td>' + esc(dash(o.reservoirName)) + '</td>'
+        + '<td>' + esc(o.windowStart) + ' 至 ' + esc(o.windowEnd) + '</td>'
+        + '<td>' + orderStatusTag(o.status) + '</td>'
+        + '<td class="num">' + esc(numText(o.targetFlow)) + '</td>'
+        + '<td class="num">' + esc(numText(o.actualMean)) + '</td>'
+        + '<td class="num is-over-text">' + esc(deviationText(o)) + '</td>'
+        + '<td><select data-dev-field="deviationReason" data-id="' + esc(o.id) + '">' + reasonOptions(o.deviationReason) + '</select>'
+        + (o.deviationReason ? '' : '<em class="field-msg">未分类</em>') + '</td>'
+        + '<td><div class="inline-nowrap">'
+        + '<input type="text" data-dev-field="deviationNote" data-id="' + esc(o.id) + '" value="' + esc(o.deviationNote || '') + '" placeholder="原因说明，可不填" />'
+        + '<button type="button" class="btn btn-sm" data-action="save-deviation" data-id="' + esc(o.id) + '">登记原因</button>'
+        + '</div></td>'
+        + '</tr>');
+    });
+    html.push('</tbody></table></div>');
+    box.innerHTML = html.join('');
+  }
+
+  /* 闭环全过程：下达 → 执行 → 完成（或撤销） */
+  function lifecycleHtml(o) {
+    function step(index, title, at, who, whoLabel, state) {
+      var cls = 'step';
+      if (state === 'done') cls += ' is-done';
+      else if (state === 'current') cls += ' is-current';
+      return '<li class="' + cls + '"><span class="step-no">' + index + '</span>'
+        + '<span class="step-title">' + esc(title) + '</span>'
+        + '<span class="step-at">' + (at ? esc(at) : '未登记') + '</span>'
+        + '<span class="step-who">' + esc(whoLabel) + '：' + (who ? esc(who) : '—') + '</span></li>';
+    }
+    var steps = [
+      step(1, '下达', o.issuedAt, o.issuer, '下达人', 'done')
+    ];
+    if (o.status === '已撤销') {
+      steps.push(step(2, '执行', o.executionAt, o.executor, '执行人', o.executionAt ? 'done' : ''));
+      steps.push(step(3, '撤销', o.revokedAt, o.revoker, '撤销人', 'current'));
+    } else {
+      steps.push(step(2, '开始执行', o.executionAt, o.executor, '执行人', o.executionAt || o.status === '执行中' ? (o.executionAt ? 'done' : 'current') : ''));
+      steps.push(step(3, '完成验收', o.completionAt, o.acceptor, '验收人', o.status === '已完成' ? 'done' : (o.status === '执行中' ? 'current' : '')));
+    }
+    return '<h4>全过程登记 <span class="card-sub">下达、执行、完成逐段登记，时刻与人员均取接口字段</span></h4>'
+      + '<ol class="steps">' + steps.join('') + '</ol>';
+  }
+
+  /* 时段内出库对账：逐条出库记录 + 汇总 */
+  function reconciliationHtml(o) {
+    var rows = o.releases || [];
+    var body;
+    if (!rows.length) {
+      body = '<tr><td colspan="6"><p class="empty">时段内还没有出库记录；执行中可在下方「登记实际下泄流量」逐日登记。</p></td></tr>';
+    } else {
+      body = rows.map(function (r) {
+        return '<tr' + (r.linked ? ' class="is-linked"' : '') + '>'
+          + '<td>' + esc(r.date) + '</td>'
+          + '<td class="num">' + esc(numText(r.flow)) + '</td>'
+          + '<td>' + esc(dash(r.type)) + '</td>'
+          + '<td>' + (r.linked ? '<span class="tag is-strong">执行登记</span>' : '<span class="tag">出库记录</span>') + '</td>'
+          + '<td>' + esc(dash(r.operator)) + '</td>'
+          + '<td class="num">' + esc(numText(r.volumeWan)) + '</td>'
+          + '</tr>';
+      }).join('');
+    }
+    var missing = (o.missingDates || []);
+    var summaryItems = [
+      ['目标下泄流量', o.targetFlow],
+      ['允许偏差（设置）', '±' + o.deviationTolerance],
+      ['允许范围（m³/s）', o.deviationLower + ' ~ ' + o.deviationUpper],
+      ['时段天数', o.expectedDays + ' 天'],
+      ['有出库记录的天数', o.recordedDays + ' 天'],
+      ['缺记日期', missing.length ? missing.join('、') : '无'],
+      ['平均下泄流量（接口）', o.actualMean],
+      ['偏差 = 实际均值 − 目标（接口）', deviationText(o)],
+      ['是否在允许范围内（接口）', o.withinTolerance === null ? '—' : (o.withinTolerance ? '在范围内' : '超出范围')]
+    ];
+    return '<h4>与出库记录对账 <span class="card-sub">按指令时段汇总 <code>出库流量</code> 记录，逐日取日均值后再算时段平均</span></h4>'
+      + '<div class="detail-grid">' + summaryItems.map(itemHtml).join('') + '</div>'
+      + (missing.length ? '<p class="form-error-inline">时段内有 ' + missing.length + ' 天没有出库记录：' + esc(missing.join('、')) + '，完成验收前必须补齐。</p>' : '')
+      + '<div class="table-wrap"><table class="mini-table"><thead><tr>'
+      + '<th>日期</th><th>出库流量（m³/s）</th><th>类别</th><th>来源</th><th>记录人</th><th>对应水量（万m³）</th>'
+      + '</tr></thead><tbody>' + body + '</tbody></table></div>';
+  }
+
+  function stageActionsHtml(o) {
+    var html = ['<h4>阶段登记 <span class="card-sub">状态只能按 已下达 → 执行中 → 已完成 逐段推进，也可撤销</span></h4>'];
+    html.push('<div data-role="stage-error" class="form-error" hidden></div>');
+
+    if (o.status === '已下达') {
+      html.push('<div class="inline-form">'
+        + '<label class="field"><span>执行时刻（日期）</span><input type="date" data-stage-field="executionAt" value="' + esc(todayIso()) + '" /></label>'
+        + '<label class="field"><span>执行人</span><input type="text" data-stage-field="executor" placeholder="值班员" /></label>'
+        + '<button type="button" class="btn btn-primary btn-sm" data-action="start-order" data-id="' + esc(o.id) + '">登记开始执行</button>'
+        + '</div>');
+      html.push('<div class="inline-form">'
+        + '<label class="field"><span>撤销时刻（日期）</span><input type="date" data-stage-field="revokedAt" value="' + esc(todayIso()) + '" /></label>'
+        + '<label class="field"><span>撤销人</span><input type="text" data-stage-field="revoker" placeholder="调度科" /></label>'
+        + '<button type="button" class="btn btn-sm" data-action="revoke-order" data-id="' + esc(o.id) + '">撤销指令</button>'
+        + '</div>');
+    } else if (o.status === '执行中') {
+      html.push('<div class="inline-form execution-form">'
+        + '<label class="field"><span>登记日期（须在时段内）</span><input type="date" data-exec-field="date" value="' + esc(todayIso()) + '" /></label>'
+        + '<label class="field"><span>实际下泄流量（m³/s）</span><input type="number" step="0.01" data-exec-field="flow" placeholder="60" /></label>'
+        + '<label class="field"><span>类别</span><input type="text" data-exec-field="type" value="执行登记" /></label>'
+        + '<label class="field"><span>值班/执行人</span><input type="text" data-exec-field="operator" value="' + esc(o.executor || '') + '" /></label>'
+        + '<label class="field field-wide"><span>备注</span><input type="text" data-exec-field="remark" placeholder="可不填" /></label>'
+        + '<button type="button" class="btn btn-primary btn-sm" data-action="add-execution" data-id="' + esc(o.id) + '">登记当天实际流量</button>'
+        + '<em class="field-msg" data-field-error="execution" hidden></em>'
+        + '</div>');
+
+      var outOfRange = o.withinTolerance === false;
+      html.push('<div class="inline-form complete-form' + (outOfRange ? ' is-out-of-range' : '') + '">'
+        + '<label class="field"><span>完成时刻（日期）</span><input type="date" data-stage-field="completionAt" value="' + esc(todayIso()) + '" /></label>'
+        + '<label class="field"><span>验收人</span><input type="text" data-stage-field="acceptor" placeholder="王调度长" /></label>');
+      if (outOfRange) {
+        html.push('<label class="field"><span>偏差原因分类（必选）</span><select data-stage-field="deviationReason">' + reasonOptions(o.deviationReason) + '</select></label>'
+          + '<label class="field field-wide"><span>偏差原因说明</span><input type="text" data-stage-field="deviationNote" value="' + esc(o.deviationNote || '') + '" placeholder="说明超出允许范围的原因" /></label>');
+      }
+      html.push('<button type="button" class="btn btn-primary btn-sm" data-action="complete-order" data-id="' + esc(o.id) + '">登记完成并验收</button>'
+        + '</div>');
+
+      html.push('<div class="inline-form">'
+        + '<label class="field"><span>撤销时刻（日期）</span><input type="date" data-stage-field="revokedAt" value="' + esc(todayIso()) + '" /></label>'
+        + '<label class="field"><span>撤销人</span><input type="text" data-stage-field="revoker" placeholder="调度科" /></label>'
+        + '<button type="button" class="btn btn-sm" data-action="revoke-order" data-id="' + esc(o.id) + '">撤销指令</button>'
+        + '</div>');
+    } else if (o.status === '已完成') {
+      html.push('<p class="side-note">已完成验收：' + esc(o.completionAt || '') + '，验收人 ' + esc(o.acceptor || '—') + '。</p>');
+      if (o.withinTolerance === false) {
+        html.push('<div class="inline-form">'
+          + '<label class="field"><span>偏差原因分类</span><select data-dev-field="deviationReason" data-id="' + esc(o.id) + '">' + reasonOptions(o.deviationReason) + '</select></label>'
+          + '<label class="field"><span>原因说明</span><input type="text" data-dev-field="deviationNote" data-id="' + esc(o.id) + '" value="' + esc(o.deviationNote || '') + '" /></label>'
+          + '<button type="button" class="btn btn-sm" data-action="save-deviation" data-id="' + esc(o.id) + '">更新原因分类</button>'
+          + '</div>');
+      }
+    } else {
+      html.push('<p class="side-note">指令已撤销：' + esc(o.revokedAt || '') + '，撤销人 ' + esc(o.revoker || '—') + '。</p>');
+    }
+    return html.join('');
+  }
+
   function renderOrders() {
+    renderOrderDeviations();
     var rows = state.orders || [];
     var tbody = el('orderRows');
     var colspan = columnCount('orderRows');
@@ -731,31 +924,33 @@
         + '<td>' + esc(dash(o.issuedAt)) + '</td>'
         + '<td class="num">' + esc(numText(o.targetFlow)) + '</td>'
         + '<td>' + esc(dash(o.windowStart)) + ' 至 ' + esc(dash(o.windowEnd)) + '</td>'
-        + '<td><span class="tag is-strong">' + esc(dash(o.status)) + '</span></td>'
+        + '<td>' + orderStatusTag(o.status) + '</td>'
         + '<td class="num">' + esc(numText(o.actualMean)) + '</td>'
-        + '<td class="num">' + esc(numText(o.deviation)) + '</td>'
+        + '<td class="num' + (o.withinTolerance === false ? ' is-over-text' : '') + '">' + esc(deviationText(o)) + '</td>'
+        + '<td>' + esc(numText(o.deviationLower)) + ' ~ ' + esc(numText(o.deviationUpper)) + '</td>'
+        + '<td>' + toleranceTag(o) + '</td>'
         + '<td class="num">' + attachCount + '</td>'
         + '</tr>');
 
       if (expanded) {
-        var items = [
+        var baseItems = [
           ['理由', o.reason],
           ['下达人', o.issuer],
-          ['备注', o.remark],
-          ['实际均值（接口）', o.actualMean],
-          ['偏差（接口）', o.deviation],
-          ['时段内出库记录条数', o.releaseCount],
-          ['当前状态', o.status]
+          ['执行人', o.executor],
+          ['验收人', o.acceptor],
+          ['撤销人', o.revoker],
+          ['备注', o.remark]
         ];
         var attach = (o.attachments || []).map(function (a) {
           return '<li>' + esc(a.name) + '（' + esc(dash(a.note)) + '，' + esc(dash(a.at)) + '）</li>';
         }).join('');
-        var statusOptions = ORDER_STATUSES.map(function (s) {
-          return '<option value="' + esc(s) + '"' + (s === o.status ? ' selected' : '') + '>' + esc(s) + '</option>';
-        }).join('');
 
         html.push('<tr class="detail-row" data-detail-for="' + esc(o.id) + '"><td colspan="' + colspan + '"><div class="detail" data-order-id="' + esc(o.id) + '">'
-          + '<div class="detail-grid">' + items.map(itemHtml).join('') + '</div>'
+          + '<div class="detail-grid">' + baseItems.map(itemHtml).join('') + '</div>'
+
+          + lifecycleHtml(o)
+          + stageActionsHtml(o)
+          + reconciliationHtml(o)
 
           + '<h4>附件清单 <span class="card-sub">接口 <code>POST /api/orders/:id/attachments</code>，共 ' + attachCount + ' 件</span></h4>'
           + (attach ? '<ul class="attach-list">' + attach + '</ul>' : '<p class="empty">还没有附件。</p>')
@@ -765,12 +960,14 @@
           + '<button type="button" class="btn btn-sm" data-action="add-attachment" data-id="' + esc(o.id) + '">新增附件</button>'
           + '</div>'
 
-          + '<h4>改状态与修改 <span class="card-sub">接口 <code>PATCH /api/orders/:id</code></span></h4>'
+          + '<h4>修改指令内容 <span class="card-sub">接口 <code>PATCH /api/orders/:id</code>；状态请用上方阶段登记</span></h4>'
           + '<div class="inline-form">'
           + '<label class="field"><span>目标下泄流量</span><input type="number" step="0.01" data-order-field="targetFlow" value="' + esc(numText(o.targetFlow) === '—' ? '' : o.targetFlow) + '" /></label>'
           + '<label class="field"><span>时段起</span><input type="date" data-order-field="windowStart" value="' + esc(o.windowStart) + '" /></label>'
           + '<label class="field"><span>时段止</span><input type="date" data-order-field="windowEnd" value="' + esc(o.windowEnd) + '" /></label>'
-          + '<label class="field"><span>状态</span><select data-order-field="status">' + statusOptions + '</select></label>'
+          + '<label class="field"><span>下达人</span><input type="text" data-order-field="issuer" value="' + esc(o.issuer || '') + '" /></label>'
+          + '<label class="field"><span>理由</span><input type="text" data-order-field="reason" value="' + esc(o.reason || '') + '" /></label>'
+          + '<label class="field field-wide"><span>备注</span><input type="text" data-order-field="remark" value="' + esc(o.remark || '') + '" /></label>'
           + '<button type="button" class="btn btn-primary btn-sm" data-action="save-order" data-id="' + esc(o.id) + '">保存修改</button>'
           + '</div>'
 
@@ -839,8 +1036,9 @@
       + '<label class="field"><span>平衡容差（万m³）</span><input type="number" step="0.01" name="balanceToleranceWan" value="' + esc(s.balanceToleranceWan) + '" /><em class="field-msg" data-field-error="balanceToleranceWan" hidden></em></label>'
       + '<label class="field"><span>入库注意流量（m³/s）</span><input type="number" step="0.01" name="inflowAttentionFlow" value="' + esc(s.inflowAttentionFlow) + '" /><em class="field-msg" data-field-error="inflowAttentionFlow" hidden></em></label>'
       + '<label class="field"><span>入库严重流量（m³/s）</span><input type="number" step="0.01" name="inflowSeriousFlow" value="' + esc(s.inflowSeriousFlow) + '" /><em class="field-msg" data-field-error="inflowSeriousFlow" hidden></em></label>'
+      + '<label class="field"><span>指令流量允许偏差（±m³/s）</span><input type="number" step="0.01" name="flowDeviationTolerance" value="' + esc(s.flowDeviationTolerance) + '" /><em class="field-msg" data-field-error="flowDeviationTolerance" hidden></em></label>'
       + '</div>'
-      + '<p class="side-note">水量单位 ' + esc(dash(s.volumeUnit)) + '，流量单位 ' + esc(dash(s.flowUnit)) + '，水位精度 ' + esc(dash(s.levelPrecision)) + '。保存后限水位与是否超限会按新汛期重新取接口值。</p>';
+      + '<p class="side-note">水量单位 ' + esc(dash(s.volumeUnit)) + '，流量单位 ' + esc(dash(s.flowUnit)) + '，水位精度 ' + esc(dash(s.levelPrecision)) + '。允许偏差用于判定指令的实际平均下泄流量是否在目标流量范围内。保存后限水位与是否超限会按新汛期重新取接口值。</p>';
     el('modalFoot').innerHTML = '<button type="button" class="btn btn-ghost" data-action="close-modal">取消</button>'
       + '<button type="button" class="btn btn-primary" data-action="save-settings">保存设置</button>';
     el('modalError').setAttribute('hidden', '');
@@ -860,7 +1058,7 @@
       var input = qs('[name="' + key + '"]');
       if (input) body[key] = input.value.trim();
     });
-    ['lossPerDayWan', 'balanceToleranceWan', 'inflowAttentionFlow', 'inflowSeriousFlow'].forEach(function (key) {
+    ['lossPerDayWan', 'balanceToleranceWan', 'inflowAttentionFlow', 'inflowSeriousFlow', 'flowDeviationTolerance'].forEach(function (key) {
       var input = qs('[name="' + key + '"]');
       if (input) body[key] = Number(input.value);
     });
@@ -871,10 +1069,13 @@
       toast('设置已保存');
       state.summary = await api('GET', '/api/summary');
       state.levels = await api('GET', '/api/levels' + queryString({ reservoirId: state.filters.water.reservoirId, from: state.filters.water.from, to: state.filters.water.to }));
+      state.orders = await api('GET', '/api/orders' + ordersQuery());
+      state.orderDeviations = await api('GET', '/api/orders?outOfRange=1');
       renderTopbar();
       renderSidebar();
       renderOverview();
       renderWater();
+      renderOrders();
       renderBalance();
     } catch (err) {
       showError(err, el('modalError'));
@@ -948,7 +1149,6 @@
         targetFlow: Number(values.targetFlow),
         windowStart: values.windowStart,
         windowEnd: values.windowEnd,
-        status: values.status,
         reason: values.reason,
         issuer: values.issuer,
         remark: values.remark
@@ -1114,6 +1314,48 @@
         toast('附件已登记');
         await reloadView('orders');
       } catch (err) { showError(err, qs('[data-role="order-error"]', detail)); }
+      return;
+    }
+    if (action === 'start-order' || action === 'complete-order' || action === 'revoke-order') {
+      var stageAction = action === 'start-order' ? 'start' : (action === 'complete-order' ? 'complete' : 'revoke');
+      var sbox = btn.closest('.detail');
+      var stageBody = {};
+      qsa('[data-stage-field]', sbox).forEach(function (node) { stageBody[node.dataset.stageField] = node.value; });
+      var stageErr = qs('[data-role="stage-error"]', sbox);
+      try {
+        await api('POST', '/api/orders/' + encodeURIComponent(btn.dataset.id) + '/stages/' + stageAction, stageBody);
+        toast(stageAction === 'start' ? '已登记开始执行' : (stageAction === 'complete' ? '已登记完成验收' : '指令已撤销'));
+        await reloadView('orders');
+      } catch (err) { showError(err, stageErr); }
+      return;
+    }
+    if (action === 'add-execution') {
+      var ebox = btn.closest('.execution-form');
+      var ebody = {};
+      qsa('[data-exec-field]', ebox).forEach(function (node) { ebody[node.dataset.execField] = node.value; });
+      ebody.flow = Number(ebody.flow);
+      try {
+        var r = await api('POST', '/api/orders/' + encodeURIComponent(btn.dataset.id) + '/executions', ebody);
+        toast(r.updated ? '当天出库流量已更新' : '实际下泄流量已登记');
+        await reloadView('orders');
+      } catch (err) { showError(err, qs('[data-role="stage-error"]', btn.closest('.detail'))); }
+      return;
+    }
+    if (action === 'save-deviation') {
+      var id = btn.dataset.id;
+      var scope = btn.closest('tr') || btn.closest('.detail') || document;
+      var reasonNode = qs('[data-dev-field="deviationReason"][data-id="' + id + '"]', scope);
+      var noteNode = qs('[data-dev-field="deviationNote"][data-id="' + id + '"]', scope);
+      if (!reasonNode) reasonNode = qs('[data-dev-field="deviationReason"][data-id="' + id + '"]');
+      if (!noteNode) noteNode = qs('[data-dev-field="deviationNote"][data-id="' + id + '"]');
+      try {
+        await api('PATCH', '/api/orders/' + encodeURIComponent(id) + '/deviation', {
+          deviationReason: reasonNode ? reasonNode.value : '',
+          deviationNote: noteNode ? noteNode.value : ''
+        });
+        toast('偏差原因已登记');
+        await reloadView('orders');
+      } catch (err) { showError(err); }
       return;
     }
     if (action === 'save-order') {
@@ -1330,6 +1572,7 @@
       state.flows.inflow = await api('GET', '/api/flows?kind=inflow');
       state.flows.release = await api('GET', '/api/flows?kind=release');
       state.orders = await api('GET', '/api/orders');
+      state.orderDeviations = await api('GET', '/api/orders?outOfRange=1');
     } catch (err) {
       showError(err);
     }

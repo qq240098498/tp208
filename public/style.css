@@ -466,3 +466,60 @@ code {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ---------- 指令闭环：全过程时间线、阶段登记、偏差清单 ---------- */
+.steps {
+  list-style: none;
+  margin: 6px 0 12px;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 8px;
+}
+.steps .step {
+  display: grid;
+  grid-template-columns: 22px 1fr;
+  grid-template-areas:
+    "no title"
+    "no at"
+    "no who";
+  gap: 1px 8px;
+  padding: 8px 10px;
+  border: 1px dashed var(--line);
+  border-radius: var(--radius);
+  background: #faf8f2;
+  color: var(--ink-soft);
+}
+.steps .step .step-no {
+  grid-area: no;
+  width: 22px; height: 22px;
+  border-radius: 50%;
+  background: #e7e2d4;
+  color: var(--ink-soft);
+  font-size: 12px; font-weight: 700;
+  display: flex; align-items: center; justify-content: center;
+}
+.steps .step .step-title { grid-area: title; font-weight: 700; font-size: 12px; }
+.steps .step .step-at { grid-area: at; font-size: 12px; font-variant-numeric: tabular-nums; }
+.steps .step .step-who { grid-area: who; font-size: 11px; }
+.steps .step.is-done { border-style: solid; border-color: #bcd8c6; background: var(--green-soft); color: #24513a; }
+.steps .step.is-done .step-no { background: #5e9b76; color: #fff; }
+.steps .step.is-current { border-color: #c3cdf0; background: var(--indigo-soft); color: var(--indigo-deep); }
+.steps .step.is-current .step-no { background: var(--indigo); color: #fff; }
+
+td.is-over-text { color: var(--orange); font-weight: 700; }
+tr.is-unclassified { background: #fff6f3; }
+tr.is-linked { background: var(--indigo-soft); }
+.inline-nowrap { display: flex; gap: 6px; align-items: center; }
+.inline-nowrap input { min-width: 180px; }
+.form-error-inline {
+  margin: 6px 0;
+  padding: 6px 10px;
+  background: var(--orange-soft);
+  border-left: 4px solid var(--orange);
+  border-radius: var(--radius);
+  color: #8d3315;
+  font-size: 12px;
+}
+.complete-form.is-out-of-range { border: 1px solid #eec3b4; border-radius: var(--radius); padding: 8px; background: #fff6f3; }
+.execution-form { border: 1px solid var(--line-soft); border-radius: var(--radius); padding: 8px; background: #fffefb; }
