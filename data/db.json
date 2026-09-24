@@ -8,7 +8,8 @@
     "lossPerDayWan": 1.2,
     "levelPrecision": 0.01,
     "inflowAttentionFlow": 120,
-    "inflowSeriousFlow": 260
+    "inflowSeriousFlow": 260,
+    "orderFlowTolerance": 5
   },
   "reservoirs": [
     {
@@ -1757,6 +1758,65 @@
       "reason": "满足下游灌溉用水",
       "issuer": "调度科",
       "remark": "",
+      "startedAt": "2026-05-06",
+      "starter": "值班员 赵强",
+      "completedAt": "2026-05-10",
+      "acceptor": "张工",
+      "completeRemark": "实际按发电流量下泄，灌区中途减少取水",
+      "canceledAt": "",
+      "canceler": "",
+      "cancelReason": "",
+      "executionFlows": [
+        {
+          "id": "exf-0001",
+          "date": "2026-05-06",
+          "flow": 52,
+          "operator": "值班员 赵强",
+          "remark": "开班登记",
+          "recordedAt": "2026-05-06",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0002",
+          "date": "2026-05-07",
+          "flow": 52,
+          "operator": "值班员 赵强",
+          "remark": "",
+          "recordedAt": "2026-05-07",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0003",
+          "date": "2026-05-08",
+          "flow": 52,
+          "operator": "值班员 赵强",
+          "remark": "",
+          "recordedAt": "2026-05-08",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0004",
+          "date": "2026-05-09",
+          "flow": 52,
+          "operator": "值班员 赵强",
+          "remark": "",
+          "recordedAt": "2026-05-09",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0005",
+          "date": "2026-05-10",
+          "flow": 52,
+          "operator": "值班员 赵强",
+          "remark": "收班登记",
+          "recordedAt": "2026-05-10",
+          "updatedAt": ""
+        }
+      ],
+      "deviationReasons": [
+        "下游用水需求变化"
+      ],
+      "deviationNote": "灌区 5 月 8 日起减少取水，实际维持发电基荷流量 52 m³/s",
       "attachments": [
         {
           "name": "灌溉用水申请",
@@ -1777,6 +1837,47 @@
       "reason": "应对 6 月 8 日强降雨，提前预泄",
       "issuer": "调度科",
       "remark": "",
+      "startedAt": "2026-06-08",
+      "starter": "值班长 李海",
+      "completedAt": "2026-06-10",
+      "acceptor": "王副总工",
+      "completeRemark": "泄洪洞检修未具备启用条件，仅能按发电流量预泄，未达指令目标",
+      "canceledAt": "",
+      "canceler": "",
+      "cancelReason": "",
+      "executionFlows": [
+        {
+          "id": "exf-0006",
+          "date": "2026-06-08",
+          "flow": 96,
+          "operator": "值班长 李海",
+          "remark": "泄洪洞检修中，只走发电",
+          "recordedAt": "2026-06-08",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0007",
+          "date": "2026-06-09",
+          "flow": 96,
+          "operator": "值班长 李海",
+          "remark": "",
+          "recordedAt": "2026-06-09",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0008",
+          "date": "2026-06-10",
+          "flow": 96,
+          "operator": "值班长 李海",
+          "remark": "检修结束但雨势减弱，维持原流量",
+          "recordedAt": "2026-06-10",
+          "updatedAt": ""
+        }
+      ],
+      "deviationReasons": [
+        "设备故障/检修"
+      ],
+      "deviationNote": "1 号泄洪洞计划检修延至 6 月 10 日，泄流能力不足，实际仅能维持发电流量 96 m³/s",
       "attachments": [
         {
           "name": "气象预报单",
@@ -1797,6 +1898,81 @@
       "reason": "汛末水位回落",
       "issuer": "调度科",
       "remark": "",
+      "startedAt": "2026-09-12",
+      "starter": "值班员 孙磊",
+      "completedAt": "",
+      "acceptor": "",
+      "completeRemark": "",
+      "canceledAt": "",
+      "canceler": "",
+      "cancelReason": "",
+      "executionFlows": [
+        {
+          "id": "exf-0009",
+          "date": "2026-09-12",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-12",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0010",
+          "date": "2026-09-13",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-13",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0011",
+          "date": "2026-09-14",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-14",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0012",
+          "date": "2026-09-15",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-15",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0013",
+          "date": "2026-09-16",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-16",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0014",
+          "date": "2026-09-17",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "",
+          "recordedAt": "2026-09-17",
+          "updatedAt": ""
+        },
+        {
+          "id": "exf-0015",
+          "date": "2026-09-18",
+          "flow": 60,
+          "operator": "值班员 孙磊",
+          "remark": "时段末，待验收",
+          "recordedAt": "2026-09-18",
+          "updatedAt": ""
+        }
+      ],
+      "deviationReasons": [],
+      "deviationNote": "",
       "attachments": []
     },
     {
@@ -1811,6 +1987,17 @@
       "reason": "原计划供水，后因降雨取消",
       "issuer": "调度科",
       "remark": "",
+      "startedAt": "",
+      "starter": "",
+      "completedAt": "",
+      "acceptor": "",
+      "completeRemark": "",
+      "canceledAt": "2026-05-05",
+      "canceler": "调度科 周敏",
+      "cancelReason": "5 月 5 日流域降雨，下游需水自行解决，指令未执行即撤销",
+      "executionFlows": [],
+      "deviationReasons": [],
+      "deviationNote": "",
       "attachments": [
         {
           "name": "撤销说明",

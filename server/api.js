@@ -57,6 +57,11 @@ router.post('/orders', withData((data, req) => ({ __save: true, __body: records.
 router.get('/orders/:id', withData((data, req) => records.decorateOrder(data, records.findOrder(data, req.params.id))));
 router.patch('/orders/:id', withData((data, req) => ({ __save: true, __body: records.updateOrder(data, req.params.id, req.body || {}) })));
 router.post('/orders/:id/copy', withData((data, req) => ({ __save: true, __body: records.copyOrder(data, req.params.id, req.body) })));
+router.post('/orders/:id/start', withData((data, req) => ({ __save: true, __body: records.startOrder(data, req.params.id, req.body || {}) })));
+router.post('/orders/:id/execution-flows', withData((data, req) => ({ __save: true, __body: records.addExecutionFlow(data, req.params.id, req.body || {}) })));
+router.delete('/orders/:id/execution-flows/:flowId', withData((data, req) => ({ __save: true, __body: records.removeExecutionFlow(data, req.params.id, req.params.flowId) })));
+router.post('/orders/:id/complete', withData((data, req) => ({ __save: true, __body: records.completeOrder(data, req.params.id, req.body || {}) })));
+router.post('/orders/:id/cancel', withData((data, req) => ({ __save: true, __body: records.cancelOrder(data, req.params.id, req.body || {}) })));
 router.post('/orders/:id/attachments', withData((data, req) => ({ __save: true, __body: records.addAttachment(data, req.params.id, req.body || {}) })));
 router.delete('/orders/:id', withData((data, req) => ({ __save: true, __body: records.removeOrder(data, req.params.id) })));
 

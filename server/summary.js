@@ -39,7 +39,15 @@ function overview(data) {
   const orderStatusCount = {};
   for (const o of orders) orderStatusCount[o.status] = (orderStatusCount[o.status] || 0) + 1;
 
-  const exceededCount = data.levels.filter((l) => {
+  // 偏差超出允许范围的指令：取设置里的 orderFlowTolerance，已撤销的不再算
+  const tolerance = Number(settings.orderFlowTolerance) || 0;
+  const exceededOrders = orders.filter((o) => o.status !== '已撤销' && o.deviationExceeded);
+  // 偏差超限但还没登记原因分类的，要催办补原因
+  const deviationNoReasonOrders = exceededOrders.filter((o) => !(o.deviationReasons || []).length);
+  // 执行中/已完成但时段内出库记录缺天的
+  const missingReportOrders = orders.filter((o) => o.status !== '已撤销' && (o.status === '执行中' || o.status === '已完成') && o.missingReport);
+
+  const exceededLevelCount = data.levels.filter((l) => {
     const reservoir = data.reservoirs.find((r) => r.id === l.reservoirId);
     return reservoir ? water.levelCheck(reservoir, l.level, l.date, settings).exceeded : false;
   }).length;
@@ -50,11 +58,15 @@ function overview(data) {
     runningCount: data.reservoirs.filter((r) => r.status === '运行').length,
     reservoirs,
     levelCount: data.levels.length,
-    exceededCount,
+    exceededCount: exceededLevelCount.length,
     orderCount: data.orders.length,
     orderStatusCount,
     activeOrders: orders.filter((o) => o.status === '已下达' || o.status === '执行中').length,
-    orderDeviationCount: orders.filter((o) => o.deviation !== null && Math.abs(o.deviation) > 5).length,
+    orderFlowTolerance: tolerance,
+    orderDeviationCount: exceededOrders.length,
+    orderDeviationNoReasonCount: deviationNoReasonOrders.length,
+    orderMissingReportCount: missingReportOrders.length,
+    orderDeviationList: exceededOrders.map((o) => ({ id: o.id, code: o.code, reservoirId: o.reservoirId, reservoirName: o.reservoirName, status: o.status, targetFlow: o.targetFlow, actualMean: o.actualMean, deviation: o.deviation, tolerance: o.tolerance, deviationReasons: o.deviationReasons || [], missingReport: o.missingReport })),
     lossPerDayWan: Number(settings.lossPerDayWan),
     toleranceWan: Number(settings.balanceToleranceWan),
     floodSeason: settings.floodSeasonStart + ' 至 ' + settings.floodSeasonEnd,

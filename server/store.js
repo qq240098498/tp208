@@ -14,6 +14,8 @@ const DEFAULT_SETTINGS = {
   levelPrecision: 0.01,
   inflowAttentionFlow: 120,
   inflowSeriousFlow: 260,
+  // 指令执行偏差允许范围：实际平均下泄流量与目标流量之差的绝对值不超过该值（m³/s）
+  orderFlowTolerance: 5,
 };
 
 function normalize(raw) {
@@ -21,6 +23,17 @@ function normalize(raw) {
   data.settings = Object.assign({}, DEFAULT_SETTINGS, data.settings || {});
   for (const key of ['reservoirs', 'curves', 'levels', 'inflows', 'releases', 'orders']) {
     if (!Array.isArray(data[key])) data[key] = [];
+  }
+  // 老数据的指令只有状态，补齐全过程登记字段
+  for (const order of data.orders) {
+    if (!Array.isArray(order.executionFlows)) order.executionFlows = [];
+    for (const row of order.executionFlows) {
+      if (row.flow === undefined) row.flow = Number(row.actualFlow) || 0;
+      if (!row.operator) row.operator = '';
+      if (!row.remark) row.remark = '';
+    }
+    if (order.deviationReasons === undefined) order.deviationReasons = order.deviationReason ? [String(order.deviationReason)] : [];
+    if (order.deviationNote === undefined) order.deviationNote = '';
   }
   return data;
 }

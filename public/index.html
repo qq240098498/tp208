@@ -316,7 +316,7 @@
       <div class="view-head">
         <div>
           <h2>调度指令</h2>
-          <p class="view-sub">实际均值、偏差、附件数都是接口派生字段，前端原样显示。点一行在行内展开理由、下达人、备注、附件清单与改状态、复制、删除。</p>
+          <p class="view-sub">每条指令从下达、开始执行、执行中逐次登记实际下泄流量，到完成验收（验收人）逐段留痕；执行情况按指令时段与出库记录对账，平均下泄流量、偏差、是否在允许范围内全部直接显示接口字段。点一行展开全过程。</p>
         </div>
         <div class="view-actions">
           <span class="pill" id="orderCount">共 0 条</span>
@@ -324,8 +324,30 @@
         </div>
       </div>
 
+      <div class="card" id="orderDeviationCard" hidden>
+        <h3>偏差超出允许范围的指令 <span class="card-sub">按「水位与流量」里时段内出库记录汇总，口径与原因分类均取接口 <code>GET /api/summary</code></span></h3>
+        <div class="table-wrap">
+          <table class="table" id="orderDeviationTable">
+            <thead>
+              <tr>
+                <th>编号</th>
+                <th>水库</th>
+                <th>状态</th>
+                <th class="num">目标流量</th>
+                <th class="num">实际平均下泄</th>
+                <th class="num">偏差</th>
+                <th>允许范围</th>
+                <th>原因分类</th>
+                <th>出库缺报</th>
+              </tr>
+            </thead>
+            <tbody id="orderDeviationRows"></tbody>
+          </table>
+        </div>
+      </div>
+
       <div class="card">
-        <h3>新增指令 <span class="card-sub">接口 <code>POST /api/orders</code></span></h3>
+        <h3>下达新指令 <span class="card-sub">接口 <code>POST /api/orders</code>，下达后状态为「已下达」，开始执行与完成验收在指令详情里逐段登记</span></h3>
         <form class="form-grid" id="orderForm" novalidate>
           <label class="field">
             <span>水库</span>
@@ -351,16 +373,6 @@
             <span>时段止</span>
             <input type="date" name="windowEnd" />
             <em class="field-msg" data-field-error="windowEnd" hidden></em>
-          </label>
-          <label class="field">
-            <span>状态</span>
-            <select name="status">
-              <option value="已下达">已下达</option>
-              <option value="执行中">执行中</option>
-              <option value="已完成">已完成</option>
-              <option value="已撤销">已撤销</option>
-            </select>
-            <em class="field-msg" data-field-error="status" hidden></em>
           </label>
           <label class="field">
             <span>下达人</span>
@@ -394,8 +406,9 @@
               <th class="num">目标下泄流量</th>
               <th>时段</th>
               <th>状态</th>
-              <th class="num">实际均值</th>
+              <th class="num">实际平均下泄</th>
               <th class="num">偏差</th>
+              <th>偏差判定</th>
               <th class="num">附件数</th>
             </tr>
           </thead>

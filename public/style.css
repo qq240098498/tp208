@@ -466,3 +466,73 @@ code {
   .layout { grid-template-columns: 1fr; }
   .sidebar { position: static; flex-direction: row; flex-wrap: wrap; }
 }
+
+/* ---------- 指令闭环：时间线、阶段登记、对账表 ---------- */
+.timeline {
+  list-style: none;
+  margin: 8px 0 14px;
+  padding: 0;
+  display: flex;
+  align-items: flex-start;
+  flex-wrap: wrap;
+  gap: 0;
+}
+.timeline li { display: flex; align-items: flex-start; }
+.tl-step { display: flex; align-items: flex-start; gap: 8px; min-width: 170px; }
+.tl-dot {
+  flex: 0 0 26px;
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: #fff;
+  border: 2px solid var(--line);
+  color: var(--ink-soft);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: 700;
+  font-size: 12px;
+}
+.tl-step.is-done .tl-dot { background: var(--green); border-color: var(--green); color: #fff; }
+.tl-body { display: flex; flex-direction: column; line-height: 1.45; }
+.tl-label { font-weight: 700; font-size: 13px; }
+.tl-at { color: var(--indigo-deep); font-weight: 700; }
+.tl-person { color: var(--ink-soft); font-size: 12px; }
+.tl-remark { color: var(--ink-soft); font-size: 12px; }
+.tl-arrow {
+  align-self: center;
+  margin: 0 10px 18px;
+  color: var(--line);
+  font-size: 16px;
+  font-weight: 700;
+}
+.tl-arrow.is-done { color: var(--green); }
+
+.stage-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+  gap: 10px;
+  margin: 8px 0 12px;
+}
+.stage-form {
+  border: 1px solid var(--line);
+  border-radius: var(--radius);
+  background: #fffdf8;
+  padding: 10px 12px 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.stage-form h5 { margin: 0 0 2px; font-size: 13px; }
+.stage-form .field { margin: 0; }
+.stage-form .field-msg { color: var(--orange); font-style: normal; font-size: 12px; }
+.stage-form .btn { align-self: flex-start; margin-top: 2px; }
+
+.checks { display: flex; flex-wrap: wrap; gap: 4px 14px; padding: 4px 0; }
+.check { font-size: 12px; white-space: nowrap; font-weight: 400; }
+.check input { vertical-align: -2px; margin-right: 3px; }
+
+.has-warn { color: var(--orange); font-weight: 700; }
+
+.order-deviation-row { cursor: pointer; }
+.order-deviation-row:hover { background: var(--indigo-soft); }
